@@ -1,14 +1,22 @@
 package com.example.selfbluetooth;
 
+import static android.bluetooth.BluetoothAdapter.ACTION_DISCOVERY_FINISHED;
+import static android.bluetooth.BluetoothAdapter.ACTION_DISCOVERY_STARTED;
+import static android.bluetooth.BluetoothDevice.ACTION_FOUND;
+import static android.bluetooth.BluetoothDevice.ACTION_NAME_CHANGED;
+
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -21,6 +29,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import java.util.ArrayList;
 
@@ -40,29 +49,32 @@ public class DeviceListActivity extends AppCompatActivity implements AdapterView
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
+            BluetoothDevice device;
+            switch (action) {
+                case ACTION_DISCOVERY_STARTED:
+                    Log.d("MainActivity", "ACTION_DISCOVERY_STARTED");
+                    break;
+                case ACTION_FOUND:
+                    Log.d("MainActivity", "ACTION_FOUND");
+                    // デバイスが見つかった場合、Intent から BluetoothDevice を取り出す
+                    device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    Log.d("MainActivity", "device.name : " + device.getName() + ", device.address : " + device.getAddress());
 
-            // Bluetooth端末発見
-            if (BluetoothDevice.ACTION_FOUND.equals(action)) {
-                final BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
+                    // 近くのBluetoothイヤホンの場合、リストビューに追加する
+                    if (device.getBluetoothClass().getMajorDeviceClass() == BluetoothClass.Device.Major.AUDIO_VIDEO) {
                         mDeviceListAdapter.addDevice(device);
                     }
-                });
-                return;
-            }
-            // Bluetooth端末検索終了
-            if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        mScanning = false;
-                        // メニューの更新
-                        invalidateOptionsMenu();
-                    }
-                });
-                return;
+                    break;
+                case ACTION_NAME_CHANGED:
+                    Log.d("MainActivity", "ACTION_NAME_CHANGED");
+                    device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    Log.d("MainActivity", "device.name : " + device.getName() + ", device.address : " + device.getAddress());
+                    break;
+                case ACTION_DISCOVERY_FINISHED:
+                    Log.d("MainActivity", "ACTION_DISCOVERY_FINISHED");
+                    // デバイス検出が終了した場合は、BroadcastReceiver を解除
+                    context.unregisterReceiver(mBroadcastReceiver);
+                    break;
             }
         }
     };
@@ -172,8 +184,12 @@ public class DeviceListActivity extends AppCompatActivity implements AdapterView
         requestBluetoothFeature();
 
         // ブロードキャストレシーバーの登録
-        registerReceiver(mBroadcastReceiver, new IntentFilter(BluetoothDevice.ACTION_FOUND));
-        registerReceiver(mBroadcastReceiver, new IntentFilter(BluetoothAdapter.ACTION_DISCOVERY_FINISHED));
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(ACTION_DISCOVERY_STARTED);
+        filter.addAction(ACTION_FOUND);
+        filter.addAction(ACTION_NAME_CHANGED);
+        filter.addAction(ACTION_DISCOVERY_FINISHED);
+        getBaseContext().registerReceiver(mBroadcastReceiver, filter);
 
         // スキャン開始
         startScan();
@@ -223,7 +239,12 @@ public class DeviceListActivity extends AppCompatActivity implements AdapterView
 
         // スキャンの開始
         mScanning = true;
-        mBluetoothAdapter.startDiscovery();    // 約 12 秒間の問い合わせのスキャンが行われる
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_ENABLEBLUETOOTH);
+            return;
+        }
+
+        mBluetoothAdapter.startDiscovery();
 
         // メニューの更新
         invalidateOptionsMenu();
@@ -232,9 +253,12 @@ public class DeviceListActivity extends AppCompatActivity implements AdapterView
     // スキャンの停止
     private void stopScan() {
         // スキャンの停止
+        mScanning = false;
         mBluetoothAdapter.cancelDiscovery();
-    }
 
+        // メニューの更新
+        invalidateOptionsMenu();
+    }
 
     // リストビューのアイテムクリック時の処理
     @Override
