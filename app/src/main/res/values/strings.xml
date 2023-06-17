@@ -9,13 +9,18 @@
     <string name="search">Search</string>
 
     <!-- MainActivity ラベル用 -->
-    <string name="device_name">Device Name : </string>
+    <string name="device_name">BT搭載機器 : </string>
     <string name="device_address">Device Address : </string>
+    <string name="connect">接続する</string>
+    <string name="disconnect">切断する</string>
+    <string name="read_string">Read string : </string>
 
     <!-- DeviceListActivity トースト用 -->
-    <string name="unknown_device">Unknown device</string>
+    <string name="unknown_device">デバイスが見つかりません</string>
 
     <!-- DeviceListActivity メニュー用 -->
     <string name="scan">Scan</string>
     <string name="stop">Stop</string>
+
+
 </resources>
